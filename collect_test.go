@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -187,5 +188,21 @@ func TestWorktreeRejectsSourceAliases(t *testing.T) {
 	branch, err := git(context.Background(), c.GnoCore, "symbolic-ref", "--short", "HEAD")
 	if err != nil || branch != "master" {
 		t.Fatal("source checkout was detached")
+	}
+}
+
+func TestLocalPackagePatterns(t *testing.T) {
+	got, err := localPackages([]string{"gno.land/p/test/...", "./gno.land/p/test/...", "./..."})
+	if err != nil || !reflect.DeepEqual(got, []string{"./...", "./gno.land/p/test/..."}) {
+		t.Fatalf("packages may resolve through the module cache: %v %v", got, err)
+	}
+	for _, pattern := range []string{"../other", "p/../../other", "/tmp/other", "-flag", ""} {
+		if _, err := localPackages([]string{pattern}); err == nil {
+			t.Fatalf("unsafe package accepted: %q", pattern)
+		}
+	}
+	root := t.TempDir()
+	if _, err := sourcePath(root, "examples/../../outside"); err == nil {
+		t.Fatal("input escaped the worktree")
 	}
 }

@@ -234,13 +234,10 @@ func (c *Collector) Collect(ctx context.Context, ref string, opts CollectOptions
 	if len(pkgs) == 0 {
 		pkgs = []string{"./..."}
 	}
-	for _, p := range pkgs {
-		if p == "" || strings.HasPrefix(p, "-") {
-			return nil, fmt.Errorf("invalid package %q", p)
-		}
+	pkgs, err = localPackages(pkgs)
+	if err != nil {
+		return nil, err
 	}
-	sort.Strings(pkgs)
-	pkgs = compactStrings(pkgs)
 	parallel := opts.Parallelism
 	if parallel == 0 {
 		parallel = c.Config.Parallelism
@@ -420,6 +417,38 @@ func compactStrings(items []string) []string {
 	return out
 }
 
+func localPackages(patterns []string) ([]string, error) {
+	out := make([]string, 0, len(patterns))
+	for _, pattern := range patterns {
+		if pattern == "" || strings.HasPrefix(pattern, "-") || filepath.IsAbs(pattern) {
+			return nil, fmt.Errorf("invalid local package %q", pattern)
+		}
+		clean := filepath.ToSlash(filepath.Clean(pattern))
+		if clean == ".." || strings.HasPrefix(clean, "../") {
+			return nil, fmt.Errorf("package escapes examples: %q", pattern)
+		}
+		if clean == "." {
+			out = append(out, ".")
+		} else {
+			out = append(out, "./"+clean)
+		}
+	}
+	sort.Strings(out)
+	return compactStrings(out), nil
+}
+
+func sourcePath(root, relative string) (string, error) {
+	name := filepath.Join(root, filepath.FromSlash(relative))
+	rel, err := filepath.Rel(root, name)
+	if err != nil {
+		return "", err
+	}
+	if filepath.IsAbs(relative) || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("input path escapes worktree: %q", relative)
+	}
+	return name, nil
+}
+
 func writeGzip(path string, data []byte) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
@@ -447,7 +476,11 @@ func attachInputs(root string, values []Measurement) error {
 			if !ok {
 				continue
 			}
-			files, err := filepath.Glob(filepath.Join(root, "examples", pkg, "*_test.gno"))
+			dir, err := sourcePath(root, "examples/"+pkg)
+			if err != nil {
+				return err
+			}
+			files, err := filepath.Glob(filepath.Join(dir, "*_test.gno"))
 			if err != nil {
 				return err
 			}
@@ -468,7 +501,11 @@ func attachInputs(root string, values []Measurement) error {
 			}
 		}
 		if m.Source != "" {
-			data, err := os.ReadFile(filepath.Join(root, m.Source))
+			name, err := sourcePath(root, m.Source)
+			if err != nil {
+				return err
+			}
+			data, err := os.ReadFile(name)
 			if err != nil {
 				return err
 			}
