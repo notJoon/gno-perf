@@ -1,0 +1,2 @@
+# Run on a dedicated collector host after adjusting the absolute paths.
+*/30 * * * * cd /srv/gno-perf && /usr/local/bin/mise exec -- /srv/gno-perf/bin/gnoperf sync >> /srv/gno-perf/sync.log 2>&1

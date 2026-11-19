@@ -1,0 +1,12 @@
+[Unit]
+Description=Collect GnoVM performance metrics
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust the user and paths for the collector host.
+User=gnoperf
+WorkingDirectory=/srv/gno-perf
+ExecStart=/usr/local/bin/mise exec -- /srv/gno-perf/bin/gnoperf sync
+Nice=10

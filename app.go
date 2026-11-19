@@ -108,6 +108,38 @@ func Run(ctx context.Context, args []string, out, errout io.Writer) error {
 		collectFlags(fs, &opts, &pkgs)
 	}
 	switch args[0] {
+	case "sync":
+		maxCount := fs.Int("max", 0, "Maximum commits per run; first run starts at the current tip")
+		if err = parseFlags(fs, args[1:]); err != nil {
+			return err
+		}
+		if fs.NArg() != 0 {
+			return errors.New("sync takes no positional arguments")
+		}
+		if pkgs != "" {
+			opts.Packages = strings.Split(pkgs, ",")
+		}
+		return collector.Sync(ctx, *maxCount, opts, out)
+	case "backfill":
+		every := fs.Int("every", 1, "Collect every Nth first-parent commit")
+		if err = parseFlags(fs, args[1:]); err != nil {
+			return err
+		}
+		if fs.NArg() != 1 {
+			return errors.New("backfill requires one commit range")
+		}
+		if pkgs != "" {
+			opts.Packages = strings.Split(pkgs, ",")
+		}
+		return collector.Backfill(ctx, fs.Arg(0), *every, opts, out)
+	case "bench":
+		if err = parseFlags(fs, args[1:]); err != nil {
+			return err
+		}
+		if fs.NArg() != 1 || fs.Arg(0) != "ops" {
+			return errors.New("bench requires ops")
+		}
+		return collector.BenchOps(ctx, out)
 	case "pr":
 		base := fs.String("base", "", "Override the base commit")
 		head := fs.String("head", "", "Override the head commit")
