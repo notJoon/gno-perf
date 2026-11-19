@@ -1,4 +1,3 @@
-# Draft configuration; the loader is not implemented yet.
 # Paths are relative to this file; ~/ refers to the home directory.
 gno_core = "../gno-core"
 cache_dir = "~/.cache/gno-perf"
