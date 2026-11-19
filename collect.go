@@ -411,6 +411,12 @@ func attachInputs(root string, values []Measurement) error {
 		switch m.Kind {
 		case "filetest":
 			m.Source = "examples/" + m.Benchmark
+			nested := filepath.Join(filepath.Dir(m.Source), "filetests", filepath.Base(m.Source))
+			if _, err := os.Stat(filepath.Join(root, nested)); err == nil {
+				m.Source = filepath.ToSlash(nested)
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
 		case "unit":
 			pkg, test, ok := strings.Cut(m.Benchmark, "#")
 			if !ok {

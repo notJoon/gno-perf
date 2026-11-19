@@ -152,3 +152,21 @@ func TestCommandCancellationKillsChildren(t *testing.T) {
 		t.Fatalf("command group not cancelled promptly: %v", err)
 	}
 }
+
+func TestFiletestInputInSubdirectory(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "examples/gno.land/p/test/filetests")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "case_filetest.gno"), []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	values := []Measurement{{Kind: "filetest", Benchmark: "gno.land/p/test/case_filetest.gno"}}
+	if err := attachInputs(root, values); err != nil {
+		t.Fatal(err)
+	}
+	if values[0].Source != "examples/gno.land/p/test/filetests/case_filetest.gno" || values[0].InputHash == "" {
+		t.Fatalf("wrong filetest source: %+v", values[0])
+	}
+}
