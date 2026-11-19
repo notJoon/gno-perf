@@ -131,6 +131,19 @@ func TestCompareExplainsTestAndTransitiveDependencyChanges(t *testing.T) {
 	if !strings.Contains(strings.Join(r.Changes[0].Tags, ","), "test-changed") {
 		t.Fatal("missing test tag")
 	}
+	headSHA = commitFiles(t, c.GnoCore, map[string]string{"examples/gno.land/p/test/implementation.gno": "package test\nconst Changed = 1\n"})
+	base, head = collections(head.SHA, headSHA)
+	m.InputHash = "same"
+	base.Values = []Measurement{m}
+	m.Value = 120
+	head.Values = []Measurement{m}
+	r, err = Compare(context.Background(), c.GnoCore, base, head, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Changes) != 1 || strings.Join(r.Changes[0].Tags, ",") != "dep-changed" {
+		t.Fatalf("own implementation change was unexplained: %+v", r.Changes)
+	}
 }
 
 func TestCompareGasWantedOnly(t *testing.T) {
@@ -184,5 +197,41 @@ func TestRoundedMetricBoundary(t *testing.T) {
 	r, err = Compare(context.Background(), c.GnoCore, base, head, true)
 	if err != nil || len(r.Changes) != 1 {
 		t.Fatalf("adjacent rounded value suppressed: %+v %v", r, err)
+	}
+}
+
+func TestNestedFiletestDependency(t *testing.T) {
+	c, _ := fixtureRepo(t)
+	baseSHA := commitFiles(t, c.GnoCore, map[string]string{
+		"examples/gno.land/p/test/filetests/check_filetest.gno": "package main\nimport \"gno.land/p/leaf\"\nfunc main() {}\n",
+		"examples/gno.land/p/leaf/gnomod.toml":                  "module = \"gno.land/p/leaf\"\n",
+		"examples/gno.land/p/leaf/leaf.gno":                     "package leaf\nconst X = 1\n",
+	})
+	headSHA := commitFiles(t, c.GnoCore, map[string]string{"examples/gno.land/p/leaf/leaf.gno": "package leaf\nconst X = 2\n"})
+	base, head := collections(baseSHA, headSHA)
+	m := Measurement{Tier: 1, Kind: "filetest", Benchmark: "gno.land/p/test/check_filetest.gno", Metric: "gas", Value: 100, InputHash: "same"}
+	base.Values = []Measurement{m}
+	m.Value = 110
+	head.Values = []Measurement{m}
+	r, err := Compare(context.Background(), c.GnoCore, base, head, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Changes) != 1 || strings.Join(r.Changes[0].Tags, ",") != "dep-changed" {
+		t.Fatalf("nested import missed: %+v", r.Changes)
+	}
+}
+
+func TestReportPreservesExactGasIntegers(t *testing.T) {
+	a, b := collections("base", "head")
+	r := &Report{Base: a, Head: b, Changes: []Change{{Category: "Regressions", Benchmark: "pkg#Test", Metric: "gas", Base: 86347956429, Head: 86347956430, Delta: 1}}}
+	for _, format := range []string{"md", "text"} {
+		var out bytes.Buffer
+		if err := r.Write(&out, format); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), "86347956429") || !strings.Contains(out.String(), "86347956430") || !strings.Contains(out.String(), "+1") {
+			t.Fatal(out.String())
+		}
 	}
 }

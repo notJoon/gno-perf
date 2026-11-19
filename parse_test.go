@@ -80,14 +80,36 @@ func TestParseGnoBoundaries(t *testing.T) {
 			t.Fatal("n/a should remain absent")
 		}
 	}
-	if len(got) != 4 {
-		t.Fatalf("got %d values, want gas, cycles, storage, wall", len(got))
+	if len(got) != 3 {
+		t.Fatalf("got %d values, want gas, cycles, wall", len(got))
 	}
 	if _, err := ParseGno(strings.NewReader("=== RUN TestA\n--- GAS: broken\nok ./p 0s\n")); err == nil {
 		t.Fatal("accepted malformed gas")
 	}
 	if _, err := ParseGno(strings.NewReader("=== RUN TestA\n--- FAIL: TestA (0s)\nFAIL ./p 0s\n")); err == nil {
 		t.Fatal("accepted failed test")
+	}
+}
+
+func TestMissingStorageCapability(t *testing.T) {
+	input := "=== RUN TestA\n--- PASS: TestA (0s)\n--- GAS: 1\n--- runtime: cycle=1, allocs=1\n=== RUN ./p/a_filetest.gno\n--- PASS: ./p/a_filetest.gno (elapsed: 0s, gas: 2)\nok ./p 0s\n"
+	for _, supported := range []bool{false, true} {
+		values, err := parseGno(strings.NewReader(input), supported)
+		if err != nil {
+			t.Fatal(err)
+		}
+		count := 0
+		for _, m := range values {
+			if m.Metric == "storage" {
+				count++
+				if m.Value != 0 {
+					t.Fatal("nonzero storage")
+				}
+			}
+		}
+		if (!supported && count != 0) || (supported && count != 2) {
+			t.Fatalf("invented or missing storage: supported=%t count=%d", supported, count)
+		}
 	}
 }
 

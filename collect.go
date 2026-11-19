@@ -95,6 +95,29 @@ func (c *Collector) worktree(ctx context.Context, sha string) error {
 	} else if err != nil {
 		return err
 	}
+	sourceTop, err := git(ctx, c.Config.GnoCore, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return err
+	}
+	targetTop, err := git(ctx, w, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return err
+	}
+	sourceTop, err = filepath.EvalSymlinks(sourceTop)
+	if err != nil {
+		return err
+	}
+	targetTop, err = filepath.EvalSymlinks(targetTop)
+	if err != nil {
+		return err
+	}
+	targetPath, err := filepath.EvalSymlinks(w)
+	if err != nil {
+		return err
+	}
+	if sourceTop == targetTop || targetPath != targetTop {
+		return errors.New("worktree_dir must name a separate worktree root, not the source checkout")
+	}
 	common, err := git(ctx, w, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
 		return err
@@ -312,6 +335,8 @@ func (c *Collector) Collect(ctx context.Context, ref string, opts CollectOptions
 		}
 		help, helpErr := run("features", c.Config.WorktreeDir, filepath.Join(binDir, "gno"), "test", "-h")
 		if helpErr == nil {
+			source, sourceErr := os.ReadFile(filepath.Join(c.Config.WorktreeDir, "gnovm/pkg/test/test.go"))
+			storageSupported := sourceErr == nil && bytes.Contains(source, []byte("func fmtStorageDiffs("))
 			args := []string{"test", "-v"}
 			if strings.Contains(string(help), "-print-runtime-metrics") {
 				args = append(args, "-print-runtime-metrics")
@@ -321,13 +346,13 @@ func (c *Collector) Collect(ctx context.Context, ref string, opts CollectOptions
 			}
 			args = append(args, pkgs...)
 			data, t1Err := run("t1", filepath.Join(c.Config.WorktreeDir, "examples"), filepath.Join(binDir, "gno"), args...)
-			first := parse("t1", data, func(r *bytes.Reader) ([]Measurement, error) { return ParseGno(r) })
+			first := parse("t1", data, func(r *bytes.Reader) ([]Measurement, error) { return parseGno(r, storageSupported) })
 			if len(first) == 0 {
 				result.Errors = append(result.Errors, StepError{"t1", "no measurements found"})
 			}
 			if !opts.NoRepeat && t1Err == nil {
 				data, repeatErr := run("t1-repeat", filepath.Join(c.Config.WorktreeDir, "examples"), filepath.Join(binDir, "gno"), args...)
-				second := parse("t1-repeat", data, func(r *bytes.Reader) ([]Measurement, error) { return ParseGno(r) })
+				second := parse("t1-repeat", data, func(r *bytes.Reader) ([]Measurement, error) { return parseGno(r, storageSupported) })
 				result.Nondeterministic = CheckDeterminism(first, second)
 				if repeatErr != nil {
 					for i := range first {

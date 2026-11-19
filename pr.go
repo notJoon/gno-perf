@@ -3,6 +3,8 @@ package gnoperf
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type PRInfo struct {
@@ -24,9 +27,22 @@ type PROptions struct {
 	RebaseBase, All bool
 }
 
-func (c *Collector) fetch(ctx context.Context, ref string) error {
-	_, err := git(ctx, c.Config.GnoCore, "fetch", "https://github.com/gnolang/gno.git", ref)
-	return err
+func (c *Collector) fetch(ctx context.Context, ref string) (sha string, resultErr error) {
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		return "", err
+	}
+	temporary := "refs/gnoperf/fetch/" + hex.EncodeToString(id[:])
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_, err := git(cleanup, c.Config.GnoCore, "update-ref", "-d", temporary)
+		resultErr = errors.Join(resultErr, err)
+	}()
+	if _, err := git(ctx, c.Config.GnoCore, "fetch", "--no-write-fetch-head", "https://github.com/gnolang/gno.git", ref+":"+temporary); err != nil {
+		return "", err
+	}
+	return Resolve(ctx, c.Config.GnoCore, temporary)
 }
 
 func (c *Collector) PullRequest(ctx context.Context, number int, opts PROptions) (*Report, error) {
@@ -44,7 +60,7 @@ func (c *Collector) PullRequest(ctx context.Context, number int, opts PROptions)
 	if info.State != "OPEN" && info.State != "MERGED" {
 		return nil, fmt.Errorf("PR is %s, expected OPEN or MERGED", info.State)
 	}
-	if err = c.fetch(ctx, "pull/"+strconv.Itoa(number)+"/head"); err != nil {
+	if _, err = c.fetch(ctx, "pull/"+strconv.Itoa(number)+"/head"); err != nil {
 		return nil, err
 	}
 	base, head, err := c.prRefs(ctx, info, opts)
@@ -81,7 +97,7 @@ func (c *Collector) prRefs(ctx context.Context, info PRInfo, opts PROptions) (st
 		head = opts.Head
 	}
 	if _, err := Resolve(ctx, c.Config.GnoCore, head); err != nil {
-		if err = c.fetch(ctx, head); err != nil {
+		if _, err = c.fetch(ctx, head); err != nil {
 			return "", "", err
 		}
 	}
@@ -94,10 +110,7 @@ func (c *Collector) prRefs(ctx context.Context, info PRInfo, opts PROptions) (st
 		if opts.Base != "" {
 			return "", "", errors.New("--base cannot be combined with --rebase-base")
 		}
-		if err = c.fetch(ctx, "refs/heads/master"); err != nil {
-			return "", "", err
-		}
-		base, err = Resolve(ctx, c.Config.GnoCore, "FETCH_HEAD")
+		base, err = c.fetch(ctx, "refs/heads/master")
 		if err != nil {
 			return "", "", err
 		}
@@ -112,10 +125,7 @@ func (c *Collector) prRefs(ctx context.Context, info PRInfo, opts PROptions) (st
 		if info.BaseRefName == "" || strings.HasPrefix(info.BaseRefName, "-") {
 			return "", "", errors.New("invalid PR base branch")
 		}
-		if err = c.fetch(ctx, "refs/heads/"+info.BaseRefName); err != nil {
-			return "", "", err
-		}
-		tip, err := Resolve(ctx, c.Config.GnoCore, "FETCH_HEAD")
+		tip, err := c.fetch(ctx, "refs/heads/"+info.BaseRefName)
 		if err != nil {
 			return "", "", err
 		}

@@ -33,7 +33,7 @@ func (c *Collector) BenchOps(ctx context.Context, out io.Writer) error {
 		return err
 	}
 	env := []string{"GOTOOLCHAIN=" + version, "GOFLAGS=", "GNOROOT=" + c.Config.WorktreeDir, "GOMAXPROCS=2"}
-	data, err := output(ctx, c.Config.WorktreeDir, env, "nice", "-n", "10", "go", "test", "./gnovm/pkg/gnolang", "-run", "^$", "-bench", "^BenchmarkOp", "-count=10", "-benchtime=2s", "-benchmem", "-timeout=0")
+	data, err := output(ctx, c.Config.WorktreeDir, env, "nice", "-n", "10", "go", "test", "./gnovm/pkg/gnolang", "-run", "^$", "-bench", "^BenchmarkOp", "-count=3", "-benchtime=2s", "-benchmem", "-timeout=0")
 	if err != nil {
 		return err
 	}

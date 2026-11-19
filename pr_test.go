@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -98,5 +99,40 @@ func TestPullRequestCache(t *testing.T) {
 	}
 	if _, err = os.Stat(filepath.Join(c.CacheDir, "reports", "pr-1.md")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestConcurrentFetchesPreserveFetchedCommit(t *testing.T) {
+	c, root := fixtureRepo(t)
+	localRemote(t, c.GnoCore)
+	head := commitFiles(t, c.GnoCore, map[string]string{"next.txt": "next"})
+	if _, err := git(context.Background(), c.GnoCore, "update-ref", "refs/heads/previous", root); err != nil {
+		t.Fatal(err)
+	}
+	fetchHead := filepath.Join(c.GnoCore, ".git/FETCH_HEAD")
+	sentinel := []byte("preserve external fetch state\n")
+	if err := os.WriteFile(fetchHead, sentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	collector := Collector{Config: c}
+	var wg sync.WaitGroup
+	for _, tc := range []struct{ ref, want string }{{"refs/heads/previous", root}, {"refs/heads/master", head}} {
+		wg.Add(1)
+		go func(ref, want string) {
+			defer wg.Done()
+			got, err := collector.fetch(context.Background(), ref)
+			if err != nil || got != want {
+				t.Errorf("fetch %s: %s %v", ref, got, err)
+			}
+		}(tc.ref, tc.want)
+	}
+	wg.Wait()
+	data, err := os.ReadFile(fetchHead)
+	if err != nil || string(data) != string(sentinel) {
+		t.Fatal("FETCH_HEAD was overwritten")
+	}
+	refs, err := git(context.Background(), c.GnoCore, "for-each-ref", "refs/gnoperf/fetch/")
+	if err != nil || refs != "" {
+		t.Fatalf("temporary refs left behind: %s %v", refs, err)
 	}
 }

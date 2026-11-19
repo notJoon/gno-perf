@@ -77,6 +77,10 @@ func packageName(s string) string {
 
 // ParseGno waits for each package trailer before assigning buffered test output.
 func ParseGno(r io.Reader) ([]Measurement, error) {
+	return parseGno(r, false)
+}
+
+func parseGno(r io.Reader, storageSupported bool) ([]Measurement, error) {
 	var out, pending []Measurement
 	var test string
 	var parseErrors []error
@@ -142,8 +146,8 @@ func ParseGno(r io.Reader) ([]Measurement, error) {
 					}
 					add("filetest", name, "gas", n, 1)
 				}
-				n, _ := storage(line)
-				if fileGasRE.MatchString(line) {
+				n, present := storage(line)
+				if fileGasRE.MatchString(line) && (present || storageSupported) {
 					add("filetest", name, "storage", n, 1)
 				}
 			} else if !strings.Contains(m[2], "/") {
@@ -172,8 +176,10 @@ func ParseGno(r io.Reader) ([]Measurement, error) {
 					add("unit", test, metric, n, p)
 				}
 			}
-			n, _ := storage(line)
-			add("pkg", "", "storage", n, 1)
+			n, present := storage(line)
+			if present || storageSupported {
+				add("pkg", "", "storage", n, 1)
+			}
 		}
 		return nil
 	})

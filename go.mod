@@ -2,7 +2,11 @@ module github.com/notJoon/gno-perf
 
 go 1.25.9
 
-require golang.org/x/perf v0.0.0-20250414141303-3fc2b901edf3
+require (
+	github.com/pelletier/go-toml/v2 v2.2.4
+	golang.org/x/perf v0.0.0-20250414141303-3fc2b901edf3
+	modernc.org/sqlite v1.58.0
+)
 
 require (
 	github.com/aclements/go-moremath v0.0.0-20210112150236-f10218a38794 // indirect
@@ -10,11 +14,9 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	modernc.org/libc v1.75.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.58.0 // indirect
 )

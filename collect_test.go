@@ -71,7 +71,7 @@ func TestCollectWorktreeCacheAndFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.Complete || len(got.Values) != 8 || len(got.Nondeterministic) > 0 {
+	if !got.Complete || len(got.Values) != 7 || len(got.Nondeterministic) > 0 {
 		t.Fatalf("bad collection: %+v", got)
 	}
 	for _, m := range got.Values {
@@ -168,5 +168,24 @@ func TestFiletestInputInSubdirectory(t *testing.T) {
 	}
 	if values[0].Source != "examples/gno.land/p/test/filetests/case_filetest.gno" || values[0].InputHash == "" {
 		t.Fatalf("wrong filetest source: %+v", values[0])
+	}
+}
+
+func TestWorktreeRejectsSourceAliases(t *testing.T) {
+	c, sha := fixtureRepo(t)
+	alias := filepath.Join(t.TempDir(), "source-alias")
+	if err := os.Symlink(c.GnoCore, alias); err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{alias, filepath.Join(c.GnoCore, "examples")} {
+		c.WorktreeDir = target
+		collector := Collector{Config: c}
+		if err := collector.worktree(context.Background(), sha); err == nil {
+			t.Fatalf("accepted source alias %s", target)
+		}
+	}
+	branch, err := git(context.Background(), c.GnoCore, "symbolic-ref", "--short", "HEAD")
+	if err != nil || branch != "master" {
+		t.Fatal("source checkout was detached")
 	}
 }

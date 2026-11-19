@@ -35,8 +35,19 @@ type Report struct {
 }
 
 type snapshot struct {
-	files map[string][]byte
-	deps  map[string][]string
+	files   map[string][]byte
+	deps    map[string][]string
+	modules map[string]string
+}
+
+func (s *snapshot) packageOf(name string) string {
+	dir := path.Dir(name)
+	for owner := dir; owner != "." && owner != "examples"; owner = path.Dir(owner) {
+		if module := s.modules[owner]; module != "" {
+			return module
+		}
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(dir, "examples/"), "/filetests")
 }
 
 func readSnapshot(ctx context.Context, repo, sha string) (*snapshot, error) {
@@ -44,9 +55,8 @@ func readSnapshot(ctx context.Context, repo, sha string) (*snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &snapshot{files: map[string][]byte{}, deps: map[string][]string{}}
+	s := &snapshot{files: map[string][]byte{}, deps: map[string][]string{}, modules: map[string]string{}}
 	r := tar.NewReader(bytes.NewReader(data))
-	modules := map[string]string{}
 	for {
 		h, err := r.Next()
 		if err == io.EOF {
@@ -71,7 +81,7 @@ func readSnapshot(ctx context.Context, repo, sha string) (*snapshot, error) {
 				return nil, err
 			}
 			if m.Module != "" {
-				modules[path.Dir(h.Name)] = m.Module
+				s.modules[path.Dir(h.Name)] = m.Module
 			}
 		}
 	}
@@ -79,10 +89,7 @@ func readSnapshot(ctx context.Context, repo, sha string) (*snapshot, error) {
 		if !strings.HasSuffix(name, ".gno") {
 			continue
 		}
-		pkg := modules[path.Dir(name)]
-		if pkg == "" {
-			pkg = strings.TrimPrefix(path.Dir(name), "examples/")
-		}
+		pkg := s.packageOf(name)
 		file, err := parser.ParseFile(token.NewFileSet(), name, data, parser.ImportsOnly)
 		if err != nil {
 			return nil, fmt.Errorf("imports in %s: %w", name, err)
@@ -99,6 +106,10 @@ func readSnapshot(ctx context.Context, repo, sha string) (*snapshot, error) {
 }
 
 func (s *snapshot) affected(pkg string, changed map[string]bool) bool {
+	// Tests depend on their package's implementation as well as its imports.
+	if changed[pkg] {
+		return true
+	}
 	seen := map[string]bool{}
 	var visit func(string) bool
 	visit = func(p string) bool {
@@ -126,18 +137,15 @@ func changedPackages(base, head *snapshot) map[string]bool {
 		files[f] = true
 	}
 	for f := range files {
+		if strings.HasSuffix(f, "_test.gno") || strings.HasSuffix(f, "_filetest.gno") {
+			continue
+		}
+		if !strings.HasSuffix(f, ".gno") && path.Base(f) != "gnomod.toml" {
+			continue
+		}
 		if !bytes.Equal(base.files[f], head.files[f]) {
-			pkg := strings.TrimPrefix(path.Dir(f), "examples/")
-			changed[pkg] = true
 			for _, s := range []*snapshot{base, head} {
-				if b := s.files[path.Dir(f)+"/gnomod.toml"]; b != nil {
-					var m struct {
-						Module string `toml:"module"`
-					}
-					if toml.Unmarshal(b, &m) == nil && m.Module != "" {
-						changed[m.Module] = true
-					}
-				}
+				changed[s.packageOf(f)] = true
 			}
 		}
 	}
@@ -421,6 +429,14 @@ func escapeCell(s string) string {
 	return strings.NewReplacer("\n", " ", "\r", " ", "\x00", "#").Replace(s)
 }
 
+func displayValue(value float64) string { return strconv.FormatFloat(value, 'f', -1, 64) }
+func displayDelta(value float64) string {
+	if value >= 0 {
+		return "+" + displayValue(value)
+	}
+	return displayValue(value)
+}
+
 func (r *Report) Write(w io.Writer, format string) error {
 	if format != "md" && format != "text" {
 		return fmt.Errorf("unknown report format %q", format)
@@ -460,9 +476,9 @@ func (r *Report) Write(w io.Writer, format string) error {
 				notes = c.Statistics
 			}
 			if format == "md" {
-				fmt.Fprintf(&b, "| %s | %s | %.8g | %.8g | %+.8g | %+.3g%% | %s | %s |\n", escapeCell(c.Benchmark), c.Metric, c.Base, c.Head, c.Delta, c.Percent, c.Size, escapeCell(notes))
+				fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %+.3g%% | %s | %s |\n", escapeCell(c.Benchmark), c.Metric, displayValue(c.Base), displayValue(c.Head), displayDelta(c.Delta), c.Percent, c.Size, escapeCell(notes))
 			} else {
-				fmt.Fprintf(&b, "%s %s: %.8g → %.8g (%+.8g, %+.3g%%) %s %s\n", c.Benchmark, c.Metric, c.Base, c.Head, c.Delta, c.Percent, c.Size, notes)
+				fmt.Fprintf(&b, "%s %s: %s → %s (%s, %+.3g%%) %s %s\n", c.Benchmark, c.Metric, displayValue(c.Base), displayValue(c.Head), displayDelta(c.Delta), c.Percent, c.Size, notes)
 			}
 		}
 	}

@@ -38,10 +38,7 @@ func (c *Collector) Sync(ctx context.Context, maxCount int, opts CollectOptions,
 		return err
 	}
 	defer unlock()
-	if err = c.fetch(ctx, "refs/heads/master"); err != nil {
-		return err
-	}
-	tip, err := Resolve(ctx, c.Config.GnoCore, "FETCH_HEAD")
+	tip, err := c.fetch(ctx, "refs/heads/master")
 	if err != nil {
 		return err
 	}
