@@ -1,0 +1,15 @@
+# Draft configuration; the loader is not implemented yet.
+# Paths are relative to this file; ~/ refers to the home directory.
+gno_core = "../gno-core"
+cache_dir = "~/.cache/gno-perf"
+worktree_dir = "~/.cache/gno-perf/worktree"
+parallelism = 2
+
+# Adjust the initial quick scope after measuring full-suite runtime and determinism.
+quick_packages = ["gno.land/p/nt/avl/v0"]
+
+[tier2]
+count = 10
+vm_bench = '^Benchmark(Benchdata|Preprocess|ParseFile_.*|PackageLoadFromStore|GC.*)$'
+store_packages = ["tm2/pkg/iavl/benchmarks", "tm2/pkg/store/cache", "tm2/pkg/amino"]
+store_bench = '.'

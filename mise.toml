@@ -1,0 +1,28 @@
+[tools]
+go = "1.25.9"
+
+[env]
+GOTOOLCHAIN = "go1.25.9"
+
+[tasks.check]
+description = "Check Go version, modules, formatting, vet, tests, and build"
+run = [
+  "go version",
+  "go mod verify",
+  'test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }',
+  "go vet ./...",
+  "go test ./...",
+  "go build ./...",
+]
+
+[tasks.fmt]
+description = "Format Go sources"
+run = "gofmt -w ."
+
+[tasks.test]
+description = "Run Go tests"
+run = "go test ./..."
+
+[tasks.build]
+description = "Build Go packages"
+run = "go build ./..."
