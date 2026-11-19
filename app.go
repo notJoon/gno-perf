@@ -101,6 +101,36 @@ func Run(ctx context.Context, args []string, out, errout io.Writer) error {
 	var pkgs string
 	collectFlags(fs, &opts, &pkgs)
 	switch args[0] {
+	case "compare":
+		format := fs.String("format", "md", "Report format: md or text")
+		all := fs.Bool("all", false, "Show every changed series")
+		if err = parseFlags(fs, args[1:]); err != nil {
+			return err
+		}
+		if fs.NArg() != 2 {
+			return errors.New("compare requires base and head commits")
+		}
+		baseSHA, err := Resolve(ctx, c.GnoCore, fs.Arg(0))
+		if err != nil {
+			return err
+		}
+		headSHA, err := Resolve(ctx, c.GnoCore, fs.Arg(1))
+		if err != nil {
+			return err
+		}
+		base, err := store.Load(baseSHA)
+		if err != nil {
+			return err
+		}
+		head, err := store.Load(headSHA)
+		if err != nil {
+			return err
+		}
+		report, err := Compare(ctx, c.GnoCore, base, head, *all)
+		if err != nil {
+			return err
+		}
+		return report.Write(out, *format)
 	case "collect":
 		if err = parseFlags(fs, args[1:]); err != nil {
 			return err
