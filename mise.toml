@@ -25,4 +25,4 @@ run = "go test ./..."
 
 [tasks.build]
 description = "Build Go packages"
-run = "go build ./..."
+run = "go build -o bin/gnoperf ./cmd/gnoperf"
