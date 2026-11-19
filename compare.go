@@ -206,14 +206,11 @@ func Size(percent float64) string {
 	return "very large"
 }
 
-func comparisonKey(m Measurement) string { return normalizeKey(m.Key()) }
-
-// normalizeKey drops the gas-wanted value from tx keys so series match across gas limit changes.
-func normalizeKey(key string) string {
-	if strings.HasPrefix(key, "tx\x00") {
-		return gasWantedRE.ReplaceAllString(key, "${1}<gas>")
+func comparisonKey(m Measurement) string {
+	if m.Kind == "tx" {
+		return gasWantedRE.ReplaceAllString(m.Key(), "${1}<gas>")
 	}
-	return key
+	return m.Key()
 }
 
 func platform(host string) string {
@@ -253,24 +250,21 @@ func Compare(ctx context.Context, repo string, base, head *Collection, all bool)
 		}
 	}
 	baseValues, headValues := map[string][]Measurement{}, map[string][]Measurement{}
+	nondet := map[string]bool{}
+	for _, c := range []*Collection{base, head} {
+		for _, key := range c.Nondeterministic {
+			nondet[key] = true
+		}
+	}
 	for _, m := range base.Values {
 		key := comparisonKey(m)
 		baseValues[key] = append(baseValues[key], m)
+		nondet[key] = nondet[key] || m.Nondeterministic
 	}
 	for _, m := range head.Values {
 		key := comparisonKey(m)
 		headValues[key] = append(headValues[key], m)
-	}
-	nondet := map[string]bool{}
-	for _, c := range []*Collection{base, head} {
-		for _, key := range c.Nondeterministic {
-			nondet[normalizeKey(key)] = true
-		}
-		for _, m := range c.Values {
-			if m.Nondeterministic {
-				nondet[comparisonKey(m)] = true
-			}
-		}
+		nondet[key] = nondet[key] || m.Nondeterministic
 	}
 	changedText, err := git(ctx, repo, "diff", "--name-only", base.SHA, head.SHA, "--")
 	if err != nil {

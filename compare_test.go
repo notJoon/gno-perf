@@ -165,7 +165,7 @@ func TestCompareGasWantedOnly(t *testing.T) {
 	if len(r.Changes) != 1 || strings.Join(r.Changes[0].Tags, ",") != "gaswanted-only" {
 		t.Fatalf("wrong classification: %+v", r.Changes)
 	}
-	base.Nondeterministic = []string{base.Values[0].Key()}
+	base.Values[0].Nondeterministic = true
 	r, err = Compare(context.Background(), c.GnoCore, base, head, true)
 	if err != nil {
 		t.Fatal(err)
