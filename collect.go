@@ -148,6 +148,8 @@ func (c *Collector) worktree(ctx context.Context, sha string) error {
 	return err
 }
 
+var errIncomplete = errors.New("incomplete")
+
 var goDirective = regexp.MustCompile(`(?m)^go\s+([0-9]+\.[0-9]+(?:\.[0-9]+)?)\s*$`)
 
 func targetGo(mod []byte) (string, error) {
@@ -402,7 +404,7 @@ func (c *Collector) Collect(ctx context.Context, ref string, opts CollectOptions
 		return result, err
 	}
 	if !result.Complete {
-		return result, fmt.Errorf("collection %d incomplete: %d errors (logs: %s)", result.ID, len(result.Errors), logDir)
+		return result, fmt.Errorf("collection %d %w: %d errors (logs: %s)", result.ID, errIncomplete, len(result.Errors), logDir)
 	}
 	return result, nil
 }

@@ -42,6 +42,15 @@ func TestSyncCursorBackfillAndLock(t *testing.T) {
 	if _, err = s.Load(next); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("GNOPERF_FIXTURE_FAIL", "1")
+	broken := commitFiles(t, c.GnoCore, map[string]string{"examples/gas.txt": "47"})
+	if err = collector.Sync(ctx, 1, opts, &out); err != nil {
+		t.Fatalf("incomplete collection blocked sync: %v", err)
+	}
+	cursor, err = os.ReadFile(filepath.Join(c.CacheDir, "sync-cursor"))
+	if err != nil || strings.TrimSpace(string(cursor)) != broken {
+		t.Fatalf("cursor did not advance past incomplete collection: %s %v", cursor, err)
+	}
 	if err = collector.Backfill(ctx, root+".."+head, 2, opts, &out); err != nil {
 		t.Fatal(err)
 	}

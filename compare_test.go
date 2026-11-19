@@ -165,6 +165,14 @@ func TestCompareGasWantedOnly(t *testing.T) {
 	if len(r.Changes) != 1 || strings.Join(r.Changes[0].Tags, ",") != "gaswanted-only" {
 		t.Fatalf("wrong classification: %+v", r.Changes)
 	}
+	base.Nondeterministic = []string{base.Values[0].Key()}
+	r, err = Compare(context.Background(), c.GnoCore, base, head, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Changes) != 0 {
+		t.Fatalf("nondeterministic tx series compared: %+v", r.Changes)
+	}
 }
 
 func TestGroupingAndSize(t *testing.T) {

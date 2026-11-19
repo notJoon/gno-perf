@@ -13,12 +13,13 @@ import (
 )
 
 func (c *Collector) compareRefs(ctx context.Context, base, head string, opts CollectOptions) (*Report, error) {
+	// Incomplete collections still yield a report with a warning so sync and backfill keep moving.
 	a, err := c.Collect(ctx, base, opts)
-	if err != nil {
+	if err != nil && !errors.Is(err, errIncomplete) {
 		return nil, err
 	}
 	b, err := c.Collect(ctx, head, opts)
-	if err != nil {
+	if err != nil && !errors.Is(err, errIncomplete) {
 		return nil, err
 	}
 	return Compare(ctx, c.Config.GnoCore, a, b, false)
