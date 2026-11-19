@@ -36,13 +36,17 @@ type Scope struct {
 }
 
 type Collector struct {
-	Config   Config
-	Store    *Store
-	Progress func(string)
+	Config     Config
+	ConfigPath string
+	Store      *Store
+	Progress   func(string)
 }
 
 func output(ctx context.Context, dir string, env []string, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = 5 * time.Second
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), env...)
 	data, err := cmd.CombinedOutput()

@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 func fixtureRepo(t *testing.T) (Config, string) {
@@ -124,5 +127,28 @@ func TestLockAndToolchain(t *testing.T) {
 	}
 	if _, err := targetGo([]byte("module x\n")); err == nil {
 		t.Fatal("missing toolchain accepted")
+	}
+}
+
+func writeConfig(t *testing.T, c Config) string {
+	t.Helper()
+	data, err := toml.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(t.TempDir(), "gnoperf.toml")
+	if err = os.WriteFile(p, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestCommandCancellationKillsChildren(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := output(ctx, "", nil, "sh", "-c", "sleep 30 & wait")
+	if err == nil || time.Since(start) > 3*time.Second {
+		t.Fatalf("command group not cancelled promptly: %v", err)
 	}
 }

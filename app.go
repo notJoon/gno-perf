@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -94,13 +95,42 @@ func Run(ctx context.Context, args []string, out, errout io.Writer) error {
 		return err
 	}
 	defer store.Close()
-	collector := &Collector{Config: c, Store: store, Progress: func(message string) { fmt.Fprintln(errout, message) }}
+	configPath, err = filepath.Abs(configPath)
+	if err != nil {
+		return err
+	}
+	collector := &Collector{Config: c, ConfigPath: configPath, Store: store, Progress: func(message string) { fmt.Fprintln(errout, message) }}
 	fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	fs.SetOutput(errout)
 	var opts CollectOptions
 	var pkgs string
-	collectFlags(fs, &opts, &pkgs)
+	if args[0] != "compare" && args[0] != "bench" {
+		collectFlags(fs, &opts, &pkgs)
+	}
 	switch args[0] {
+	case "pr":
+		base := fs.String("base", "", "Override the base commit")
+		head := fs.String("head", "", "Override the head commit")
+		rebase := fs.Bool("rebase-base", false, "Compare a temporary merge onto current master")
+		all := fs.Bool("all", false, "Show every changed series")
+		if err = parseFlags(fs, args[1:]); err != nil {
+			return err
+		}
+		if fs.NArg() != 1 {
+			return errors.New("pr requires one PR number")
+		}
+		number, err := strconv.Atoi(fs.Arg(0))
+		if err != nil {
+			return err
+		}
+		if pkgs != "" {
+			opts.Packages = strings.Split(pkgs, ",")
+		}
+		r, err := collector.PullRequest(ctx, number, PROptions{CollectOptions: opts, Base: *base, Head: *head, RebaseBase: *rebase, All: *all})
+		if err != nil {
+			return err
+		}
+		return SaveReport(c, r, fmt.Sprintf("pr-%d-%s.md", number, r.Head.SHA[:7]), out)
 	case "compare":
 		format := fs.String("format", "md", "Report format: md or text")
 		all := fs.Bool("all", false, "Show every changed series")
