@@ -169,3 +169,20 @@ func TestGroupingAndSize(t *testing.T) {
 		}
 	}
 }
+
+func TestRoundedMetricBoundary(t *testing.T) {
+	c, sha := fixtureRepo(t)
+	base, head := collections(sha, sha)
+	base.Values = []Measurement{{Tier: 1, Kind: "unit", Benchmark: "pkg#Test", Metric: "cycles", Value: 1000, Precision: 100}}
+	head.Values = append([]Measurement{}, base.Values...)
+	head.Values[0].Value = 1050
+	r, err := Compare(context.Background(), c.GnoCore, base, head, true)
+	if err != nil || len(r.Changes) != 0 {
+		t.Fatalf("rounding noise reported: %+v %v", r, err)
+	}
+	head.Values[0].Value = 1100
+	r, err = Compare(context.Background(), c.GnoCore, base, head, true)
+	if err != nil || len(r.Changes) != 1 {
+		t.Fatalf("adjacent rounded value suppressed: %+v %v", r, err)
+	}
+}

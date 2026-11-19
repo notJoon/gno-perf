@@ -337,7 +337,7 @@ func Compare(ctx context.Context, repo string, base, head *Collection, all bool)
 				continue
 			}
 		}
-		if (b.Metric == "cycles" || b.Metric == "allocs") && math.Abs(change.Delta) <= (a.Precision+b.Precision)/2 {
+		if (b.Metric == "cycles" || b.Metric == "allocs") && math.Abs(change.Delta) <= math.Max(a.Precision, b.Precision)/2 {
 			continue
 		}
 		change.Size = Size(change.Percent)

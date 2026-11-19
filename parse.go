@@ -299,9 +299,7 @@ func CheckDeterminism(first, second []Measurement) []string {
 		}
 		delete(index, m.Key())
 	}
-	for key, m := range index {
-		m.Nondeterministic = true
-		first = append(first, m)
+	for key := range index {
 		changed = append(changed, key)
 	}
 	sort.Strings(changed)
