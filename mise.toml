@@ -9,7 +9,7 @@ description = "Check Go version, modules, formatting, vet, tests, and build"
 run = [
   "go version",
   "go mod verify",
-  'test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }',
+  '''unformatted=$(git ls-files -co --exclude-standard -z -- '*.go' | xargs -0 gofmt -l) && test -z "$unformatted" || { printf '%s\n' "$unformatted"; exit 1; }''',
   "go vet ./...",
   "go test ./...",
   "go build ./...",
@@ -17,7 +17,7 @@ run = [
 
 [tasks.fmt]
 description = "Format Go sources"
-run = "gofmt -w ."
+run = "git ls-files -co --exclude-standard -z -- '*.go' | xargs -0 gofmt -w"
 
 [tasks.test]
 description = "Run Go tests"
