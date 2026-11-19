@@ -132,6 +132,53 @@ func Run(ctx context.Context, args []string, out, errout io.Writer) error {
 			opts.Packages = strings.Split(pkgs, ",")
 		}
 		return collector.Backfill(ctx, fs.Arg(0), *every, opts, out)
+	case "bisect":
+		series := fs.String("series", "", "Series to bisect: benchmark:metric")
+		if err = parseFlags(fs, args[1:]); err != nil {
+			return err
+		}
+		if fs.NArg() != 2 {
+			return errors.New("bisect requires good and bad commits")
+		}
+		if pkgs != "" {
+			opts.Packages = strings.Split(pkgs, ",")
+		}
+		sha, err := collector.Bisect(ctx, fs.Arg(0), fs.Arg(1), *series, opts)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(out, sha)
+		return err
+	case "_bisect-check":
+		series := fs.String("series", "", "Selected series")
+		dir := fs.String("bisect-dir", "", "Bisect worktree")
+		baseline := fs.Float64("baseline", 0, "Baseline value")
+		if err = parseFlags(fs, args[1:]); err != nil {
+			return err
+		}
+		if fs.NArg() != 0 || *dir == "" {
+			return errors.New("invalid bisect helper arguments")
+		}
+		if pkgs != "" {
+			opts.Packages = strings.Split(pkgs, ",")
+		}
+		opts.NoRepeat = false
+		sha, err := Resolve(ctx, *dir, "BISECT_HEAD")
+		if err != nil {
+			return err
+		}
+		result, err := collector.Collect(ctx, sha, opts)
+		if err != nil {
+			return err
+		}
+		value, err := seriesValue(result, *series)
+		if err != nil {
+			return err
+		}
+		if value.Value != *baseline {
+			return ErrBisectBad
+		}
+		return nil
 	case "bench":
 		if err = parseFlags(fs, args[1:]); err != nil {
 			return err
