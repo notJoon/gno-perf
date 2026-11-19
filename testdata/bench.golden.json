@@ -1,0 +1,110 @@
+[
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=1000-10",
+    "Metric": "ns_op",
+    "Value": 1039791,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  },
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=1000-10",
+    "Metric": "b_op",
+    "Value": 158400,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  },
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=1000-10",
+    "Metric": "allocs_op",
+    "Value": 2114,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  },
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=4000-10",
+    "Metric": "ns_op",
+    "Value": 3362708.0000000005,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  },
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=4000-10",
+    "Metric": "b_op",
+    "Value": 473128,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  },
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=4000-10",
+    "Metric": "allocs_op",
+    "Value": 8105,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  },
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=16000-10",
+    "Metric": "ns_op",
+    "Value": 18566625,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  },
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=16000-10",
+    "Metric": "b_op",
+    "Value": 1733368,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  },
+  {
+    "Tier": 2,
+    "Kind": "gobench",
+    "Benchmark": "github.com/gnolang/gno/gnovm/pkg/gnolang#ParseFile_StarChain/N=16000-10",
+    "Metric": "allocs_op",
+    "Value": 32104,
+    "Precision": 0,
+    "Sample": 0,
+    "InputHash": "",
+    "Source": "",
+    "Nondeterministic": false
+  }
+]

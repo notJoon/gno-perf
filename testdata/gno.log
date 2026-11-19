@@ -1,0 +1,150 @@
+?       ./gno.land/p/archive/dom 	[no test files]
+=== RUN   TestWhitelist
+--- PASS: TestWhitelist (0.00s)
+--- GAS:  482141
+---       runtime: cycle=482.1k, allocs=122.3k(0.00%), storage: gno.land/p/demo/gnorkle/agent/v0:+1322b
+ok      ./gno.land/p/demo/gnorkle/agent/v0 	0.63s
+?       ./gno.land/p/demo/gnorkle/feed/v0 	[no test files]
+=== RUN   TestNewSingleValueFeed
+--- PASS: TestNewSingleValueFeed (0.00s)
+--- GAS:  401421
+---       runtime: cycle=401.4k, allocs=88.8k(0.00%), storage: gno.land/p/demo/gnorkle/feeds/static/v0:+5173b
+=== RUN   TestFeed_Ingest
+=== RUN   TestFeed_Ingest/func_invalid_error
+--- PASS: TestFeed_Ingest/func_invalid_error (0.00s)
+=== RUN   TestFeed_Ingest/func_ingest_ingest_error
+--- PASS: TestFeed_Ingest/func_ingest_ingest_error (0.00s)
+=== RUN   TestFeed_Ingest/func_ingest_commit_error
+--- PASS: TestFeed_Ingest/func_ingest_commit_error (0.00s)
+=== RUN   TestFeed_Ingest/func_commit_commit_error
+--- PASS: TestFeed_Ingest/func_commit_commit_error (0.00s)
+=== RUN   TestFeed_Ingest/only_ingest
+--- PASS: TestFeed_Ingest/only_ingest (0.00s)
+=== RUN   TestFeed_Ingest/ingest_autocommit
+--- PASS: TestFeed_Ingest/ingest_autocommit (0.00s)
+=== RUN   TestFeed_Ingest/commit_no_value
+--- PASS: TestFeed_Ingest/commit_no_value (0.00s)
+=== RUN   TestFeed_Ingest/ingest_then_commmit
+--- PASS: TestFeed_Ingest/ingest_then_commmit (0.00s)
+--- PASS: TestFeed_Ingest (0.00s)
+--- GAS:  6133320
+---       runtime: cycle=6.1M, allocs=851.1k(0.00%), storage: gno.land/p/demo/gnorkle/feeds/static/v0:+5173b
+=== RUN   TestFeed_Tasks
+=== RUN   TestFeed_Tasks/no_tasks
+--- PASS: TestFeed_Tasks/no_tasks (0.00s)
+=== RUN   TestFeed_Tasks/marshal_error
+--- PASS: TestFeed_Tasks/marshal_error (0.00s)
+=== RUN   TestFeed_Tasks/one_task
+--- PASS: TestFeed_Tasks/one_task (0.00s)
+=== RUN   TestFeed_Tasks/two_tasks
+--- PASS: TestFeed_Tasks/two_tasks (0.00s)
+--- PASS: TestFeed_Tasks (0.00s)
+--- GAS:  3283727
+---       runtime: cycle=3.3M, allocs=493.5k(0.00%), storage: gno.land/p/demo/gnorkle/feeds/static/v0:+5173b
+ok      ./gno.land/p/demo/gnorkle/feeds/static/v0 	0.18s
+<gno-form exec="FunctionName">
+<gno-input name="name" placeholder="Name" value="John Doe" />
+<gno-select name="country" value="United States" description="Select your country" />
+<gno-select name="country" value="Spain" />
+<gno-select name="country" value="Germany" />
+<gno-input type="checkbox" name="interests" value="music" description="What do you like to do?" />
+<gno-input type="checkbox" name="interests" value="tech" checked="true" />
+</gno-form>
+
+=== RUN   TestNew
+=== RUN   TestNew/ok
+--- PASS: TestNew/ok (0.00s)
+=== RUN   TestNew/no_attributes
+--- PASS: TestNew/no_attributes (0.00s)
+=== RUN   TestNew/uneven_attributes
+--- PASS: TestNew/uneven_attributes (0.00s)
+=== RUN   TestNew/invalid_attribute
+--- PASS: TestNew/invalid_attribute (0.00s)
+--- PASS: TestNew (0.00s)
+--- GAS:  3774120
+---       runtime: cycle=3.8M, allocs=429.3k(0.00%), storage: gno.land/p/jeronimoalbi/mdform/v0:+9048b
+=== RUN   TestFormInput
+=== RUN   TestFormInput/ok
+--- PASS: TestFormInput/ok (0.00s)
+=== RUN   TestFormInput/no_attributes
+--- PASS: TestFormInput/no_attributes (0.00s)
+=== RUN   TestFormInput/empty_name
+--- PASS: TestFormInput/empty_name (0.00s)
+=== RUN   TestFormInput/radio_type
+--- PASS: TestFormInput/radio_type (0.00s)
+=== RUN   TestFormInput/checkbox_type
+--- PASS: TestFormInput/checkbox_type (0.00s)
+=== RUN   TestFormInput/uneven_attributes
+--- PASS: TestFormInput/uneven_attributes (0.00s)
+=== RUN   TestFormInput/invalid_attribute
+--- PASS: TestFormInput/invalid_attribute (0.00s)
+--- PASS: TestFormInput (0.00s)
+--- GAS:  6331532
+---       runtime: cycle=6.3M, allocs=688.7k(0.00%), storage: gno.land/p/jeronimoalbi/mdform/v0:+9048b
+=== RUN   TestFormRadio
+=== RUN   TestFormRadio/ok
+--- PASS: TestFormRadio/ok (0.00s)
+=== RUN   TestFormRadio/no_attributes
+--- PASS: TestFormRadio/no_attributes (0.00s)
+=== RUN   TestFormRadio/empty_name
+--- PASS: TestFormRadio/empty_name (0.00s)
+=== RUN   TestFormRadio/ignore_type_attribute
+--- PASS: TestFormRadio/ignore_type_attribute (0.00s)
+=== RUN   TestFormRadio/ignore_value_attribute
+--- PASS: TestFormRadio/ignore_value_attribute (0.00s)
+=== RUN   TestFormRadio/uneven_attributes
+--- PASS: TestFormRadio/uneven_attributes (0.00s)
+=== RUN   TestFormRadio/invalid_attribute
+--- PASS: TestFormRadio/invalid_attribute (0.00s)
+--- PASS: TestFormRadio (0.00s)
+--- GAS:  9530816
+---       runtime: cycle=9.5M, allocs=815.1k(0.00%), storage: gno.land/p/jeronimoalbi/mdform/v0:+9048b
+=== RUN   TestFormCheckbox
+=== RUN   TestFormCheckbox/ok
+--- PASS: TestFormCheckbox/ok (0.00s)
+=== RUN   TestFormCheckbox/no_attributes
+--- PASS: TestFormCheckbox/no_attributes (0.00s)
+=== RUN   TestFormCheckbox/empty_name
+--- PASS: TestFormCheckbox/empty_name (0.00s)
+=== RUN   TestFormCheckbox/ignore_type_attribute
+--- PASS: TestFormCheckbox/ignore_type_attribute (0.00s)
+=== RUN   TestFormCheckbox/ignore_value_attribute
+--- PASS: TestFormCheckbox/ignore_value_attribute (0.00s)
+=== RUN   TestFormCheckbox/uneven_attributes
+--- PASS: TestFormCheckbox/uneven_attributes (0.00s)
+=== RUN   TestFormCheckbox/invalid_attribute
+--- PASS: TestFormCheckbox/invalid_attribute (0.00s)
+--- PASS: TestFormCheckbox (0.00s)
+--- GAS:  9712007
+---       runtime: cycle=9.7M, allocs=815.6k(0.00%), storage: gno.land/p/jeronimoalbi/mdform/v0:+9048b
+=== RUN   TestFormTextarea
+=== RUN   TestFormTextarea/ok
+--- PASS: TestFormTextarea/ok (0.00s)
+=== RUN   TestFormTextarea/no_attributes
+--- PASS: TestFormTextarea/no_attributes (0.00s)
+=== RUN   TestFormTextarea/empty_name
+--- PASS: TestFormTextarea/empty_name (0.00s)
+=== RUN   TestFormTextarea/uneven_attributes
+--- PASS: TestFormTextarea/uneven_attributes (0.00s)
+=== RUN   TestFormTextarea/invalid_attribute
+--- PASS: TestFormTextarea/invalid_attribute (0.00s)
+--- PASS: TestFormTextarea (0.00s)
+--- GAS:  5078722
+---       runtime: cycle=5.1M, allocs=530.2k(0.00%), storage: gno.land/p/jeronimoalbi/mdform/v0:+9048b
+=== RUN   TestFormSelect
+=== RUN   TestFormSelect/ok
+--- PASS: TestFormSelect/ok (0.00s)
+=== RUN   TestFormSelect/no_attributes
+--- PASS: TestFormSelect/no_attributes (0.00s)
+=== RUN   TestFormSelect/empty_name
+--- PASS: TestFormSelect/empty_name (0.00s)
+=== RUN   TestFormSelect/uneven_attributes
+--- PASS: TestFormSelect/uneven_attributes (0.00s)
+=== RUN   TestFormSelect/invalid_attribute
+--- PASS: TestFormSelect/invalid_attribute (0.00s)
+--- PASS: TestFormSelect (0.00s)
+--- GAS:  5512204
+---       runtime: cycle=5.5M, allocs=550.8k(0.00%), storage: gno.land/p/jeronimoalbi/mdform/v0:+9048b
+=== RUN   ./gno.land/p/jeronimoalbi/mdform/v0/mdform_filetest.gno
+--- PASS: ./gno.land/p/jeronimoalbi/mdform/v0/mdform_filetest.gno (elapsed: 0.00s, gas: 3010190, storage: gno.land/p/jeronimoalbi/mdform/v0:+9048b)
+ok      ./gno.land/p/jeronimoalbi/mdform/v0 	0.02s

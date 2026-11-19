@@ -1,0 +1,9 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/gnolang/gno/gnovm/pkg/gnolang
+cpu: Apple M5
+BenchmarkParseFile_StarChain/N=1000-10         	       1	   1039791 ns/op	  158400 B/op	    2114 allocs/op
+BenchmarkParseFile_StarChain/N=4000-10         	       1	   3362708 ns/op	  473128 B/op	    8105 allocs/op
+BenchmarkParseFile_StarChain/N=16000-10        	       1	  18566625 ns/op	 1733368 B/op	   32104 allocs/op
+PASS
+ok  	github.com/gnolang/gno/gnovm/pkg/gnolang	0.597s

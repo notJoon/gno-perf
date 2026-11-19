@@ -1,0 +1,124 @@
+=== RUN   TestTestdata
+=== RUN   TestTestdata/addpkg
+> gnoland start
+> gnokey maketx addpkg -pkgdir $WORK -pkgpath gno.land/r/$test1_user_addr/hello -gas-fee 370001ugnot -gas-wanted 3_700_000 -chainid=tendermint_test test1
+GAS WANTED: 3700000
+GAS USED:   3072676
+> stdout OK!
+> stdout 'GAS WANTED: 3700000'
+> stdout 'GAS USED:   \d+'
+> stdout 'HEIGHT:     \d+'
+> stdout 'EVENTS:     \[.*\]'
+> stdout 'TX HASH:    '
+> stdout 'PKGPATH:    gno.land/r/'$test1_user_addr'/hello'
+> gnokey maketx call -pkgpath gno.land/r/$test1_user_addr/hello -chainid=tendermint_test -func SayHello   -gas-fee 180001ugnot -gas-wanted 1_800_000 test1
+GAS WANTED: 1800000
+GAS USED:   980478
+> stdout '\("hello world!" string\)'
+> stdout OK!
+> stdout 'GAS WANTED: 1800000'
+> stdout 'GAS USED:   \d+'
+> stdout 'HEIGHT:     \d+'
+> stdout 'EVENTS:     \[\]'
+> stdout 'TX HASH:    '
+> gnokey maketx call -pkgpath gno.land/r/$test1_user_addr/hello -chainid=tendermint_test -func SayHello1 -args foo   -gas-fee 180001ugnot -gas-wanted 1_800_000 test1
+GAS WANTED: 1800000
+GAS USED:   982076
+> stdout '\("hello foo!" string\)'
+> stdout OK!
+> stdout 'GAS WANTED: 1800000'
+> stdout 'GAS USED:   \d+'
+> stdout 'HEIGHT:     \d+'
+> stdout 'EVENTS:     \[\]'
+> stdout 'TX HASH:    '
+> gnokey maketx call -pkgpath gno.land/r/$test1_user_addr/hello -chainid=tendermint_test -func SayHello2 -args hello -args bar  -gas-fee 180001ugnot -gas-wanted 1_800_000 test1
+GAS WANTED: 1800000
+GAS USED:   983377
+> stdout '\("hello bar!" string\)'
+> stdout OK!
+> stdout 'GAS WANTED: 1800000'
+> stdout 'GAS USED:   \d+'
+> stdout 'HEIGHT:     \d+'
+> stdout 'EVENTS:     \[\]'
+> stdout 'TX HASH:    '
+> gnokey maketx call -pkgpath gno.land/r/$test1_user_addr/hello -chainid=tendermint_test -func PreviousRealm  -gas-fee 190001ugnot -gas-wanted 1_900_000 test1
+GAS WANTED: 1900000
+GAS USED:   1052649
+> stdout 'UserRealm{ g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5 }'
+=== RUN   TestTestdata/sys_names_pause_addpkg
+> loadpkg gno.land/r/gov/dao
+> loadpkg gno.land/r/gov/dao/impl/v0
+> loadpkg gno.land/r/gov/dao/init/v0
+> loadpkg gno.land/r/sys/names
+> loadpkg gno.land/r/sys/users
+> patchpkg "g1skl80cuz8zq3lul9pgz5pc35l2pfzgxgfpsqkx" $test1_user_addr
+> gnoland start
+> gnokey maketx run -gas-fee 3400001ugnot -gas-wanted 42_000_000 -chainid=tendermint_test test1 $WORK/run/init_govdao.gno
+GAS WANTED: 42000000
+GAS USED:   30540616
+> stdout OK!
+> gnokey query vm/qeval --data "gno.land/r/sys/names.IsEnabled()"
+> stdout 'false bool'
+> gnokey maketx addpkg -pkgdir $WORK/pkg -pkgpath gno.land/r/preenable/hello -gas-fee 410001ugnot -gas-wanted 4_200_000 -chainid=tendermint_test test1
+GAS WANTED: 4200000
+GAS USED:   3482709
+> stdout OK!
+> gnokey maketx call -pkgpath gno.land/r/sys/names -func Enable -gas-fee 260001ugnot -gas-wanted 5_300_000 -chainid=tendermint_test test1
+GAS WANTED: 5300000
+GAS USED:   4243157
+> stdout OK!
+> gnokey query vm/qeval --data "gno.land/r/sys/names.IsEnabled()"
+> stdout 'true bool'
+> gnokey maketx addpkg -pkgdir $WORK/pkg -pkgpath gno.land/r/$test1_user_addr/hello -gas-fee 410001ugnot -gas-wanted 4_200_000 -chainid=tendermint_test test1
+GAS WANTED: 4200000
+GAS USED:   3498415
+> stdout OK!
+> ! gnokey maketx addpkg -pkgdir $WORK/pkg -pkgpath gno.land/r/notmyspace/hello -gas-fee 5000000ugnot -gas-wanted 50_000_000 -chainid=tendermint_test test1
+GAS WANTED: 50000000
+GAS USED:   4312280
+> stderr 'is not authorized to deploy packages to namespace'
+> gnokey maketx run -gas-fee 5000001ugnot -gas-wanted 50_000_000 -chainid=tendermint_test test1 $WORK/run/propose_pause.gno
+GAS WANTED: 50000000
+GAS USED:   30651748
+> stdout OK!
+> gnokey maketx call -pkgpath gno.land/r/gov/dao -func MustVoteOnProposalSimple -gas-fee 1900001ugnot -gas-wanted 21_000_000 -args 0 -args YES -chainid=tendermint_test test1
+GAS WANTED: 21000000
+GAS USED:   18330159
+> stdout OK!
+> gnokey maketx call -pkgpath gno.land/r/gov/dao -func ExecuteProposal -gas-fee 2300001ugnot -gas-wanted 23_000_000 -args 0 -chainid=tendermint_test test1
+GAS WANTED: 23000000
+GAS USED:   17341115
+> stdout OK!
+> gnokey query vm/qeval --data "gno.land/r/sys/names.IsPaused()"
+> stdout 'true bool'
+> ! gnokey maketx addpkg -pkgdir $WORK/pkg_pa -pkgpath gno.land/r/$test1_user_addr/paused_attempt -gas-fee 5000000ugnot -gas-wanted 50_000_000 -chainid=tendermint_test test1
+GAS WANTED: 50000000
+GAS USED:   1836831
+> stderr 'is not authorized to deploy packages to namespace'
+> ! gnokey maketx addpkg -pkgdir $WORK/pkg_pa -pkgpath gno.land/r/anotherspace/paused_attempt -gas-fee 5000000ugnot -gas-wanted 50_000_000 -chainid=tendermint_test test1
+GAS WANTED: 50000000
+GAS USED:   1836543
+> stderr 'is not authorized to deploy packages to namespace'
+> gnokey maketx call -pkgpath gno.land/r/$test1_user_addr/hello -func Hello -gas-fee 1000000ugnot -gas-wanted 1_300_000 -chainid=tendermint_test test1
+GAS WANTED: 1300000
+GAS USED:   962554
+> stdout OK!
+> stdout 'hi from hello'
+> gnokey maketx run -gas-fee 5000001ugnot -gas-wanted 50_000_000 -chainid=tendermint_test test1 $WORK/run/propose_unpause.gno
+GAS WANTED: 50000000
+GAS USED:   31335349
+> stdout OK!
+> gnokey maketx call -pkgpath gno.land/r/gov/dao -func MustVoteOnProposalSimple -gas-fee 1900001ugnot -gas-wanted 19_000_000 -args 1 -args YES -chainid=tendermint_test test1
+GAS WANTED: 19000000
+GAS USED:   16451401
+> stdout OK!
+> gnokey maketx call -pkgpath gno.land/r/gov/dao -func ExecuteProposal -gas-fee 2300001ugnot -gas-wanted 23_000_000 -args 1 -chainid=tendermint_test test1
+GAS WANTED: 23000000
+GAS USED:   17026177
+> stdout OK!
+> gnokey query vm/qeval --data "gno.land/r/sys/names.IsPaused()"
+> stdout 'false bool'
+> gnokey maketx addpkg -pkgdir $WORK/pkg_au -pkgpath gno.land/r/$test1_user_addr/after_unpause -gas-fee 410001ugnot -gas-wanted 4_200_000 -chainid=tendermint_test test1
+GAS WANTED: 4200000
+GAS USED:   3531510
+> stdout OK!
