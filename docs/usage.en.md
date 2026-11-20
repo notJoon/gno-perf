@@ -50,7 +50,7 @@ gnoperf [--config path] <command> [options]
 
 ### Shared collection options
 
-For `collect`, `pr`, `sync`, `backfill`, and `bisect`:
+For `collect`, `pr`, `sync`, `backfill`, and `bisect` (not `compare` or `triage`, which only read the DB):
 
 | Option | Effect |
 |---|---|
@@ -76,7 +76,7 @@ gnoperf pr 6476 --rebase-base
 |---|---|
 | `--base <sha>` / `--head <sha>` | Override the automatic base/head |
 | `--rebase-base` | Compare master with a temporary commit merging the PR onto its tip; abort on conflicts; incompatible with `--base` |
-| `--all` | Show every series without package grouping |
+| `--all` | Show every series: no 0.2% filter, row cap, package grouping, or name shortening |
 
 - Merged PR: head = merge commit, base = `head^1`. Open PR: head = `headRefOid`, base = merge-base with the base branch.
 - Base runs once; head runs twice for determinism. PR reports always warn `determinism check was skipped`.
@@ -129,9 +129,24 @@ Compare first-parent commits in `from..to` (excluding `from`) with their parents
 gnoperf bisect <good> <bad> --series 'gno.land/p/nt/avl/v0#TestTreeSet:gas' --quick
 ```
 
-- `--series <benchmark>:<metric>` uses the report's benchmark column. Expand `(N tests)` groups with `--all`.
+- `--series <benchmark>:<metric>` uses the report's benchmark column from `--all` output (exact names, no `(N tests)` groups).
 - Requires a deterministic Tier 1 series, `good` on the first-parent chain of `bad`, and different endpoint values.
 - Runs `git bisect run --first-parent` in a separate temporary worktree; prints the sha where the value first changed. Ignores `--no-repeat`: determinism is always checked.
+
+### `triage`: draft a weekly triage log
+
+```sh
+gnoperf triage <last log's final commit>..origin/master > triage/2026-11-20.md
+```
+
+Modeled on rustc-perf's `/perf/triage`. Reads stored collections only; it never collects.
+
+- Walks first-parent commits in `from..to` (excluding `from`) and compares each with its first parent.
+- `review needed` commits get their PR link, warnings, primary summary table, and Regressions/Improvements rows, followed by `Verdict: TODO`.
+- Other commits are one line each under `No action needed`; warnings (e.g. `collector versions differ`) follow on the same line.
+- Commits missing either collection are listed under `Not collected (run sync or backfill)`.
+- The header has a primary summary from the first collected base to the last collected head, the harness versions, and a `Security check: TODO` line. New nondeterministic series get their own table.
+- Fill in every `TODO` before committing the log; see [triage.en.md](./triage.en.md).
 
 ### `bench ops`: run opcode benchmarks manually
 
@@ -144,21 +159,33 @@ Runs `BenchmarkOp*` at the HEAD of `gno_core` with `-count=3 -benchtime=2s`. Pri
 ## Reports
 
 ```
-## gno-perf — PR #6089 (merged)
-head d0cbe58c32b8 vs base 18f41ec14ecd · harness <gno-perf commit>+<binary hash>
+## gno-perf — PR #6110 (open)
+head 0cf40baccd8f vs base d25b308c1a22 · harness <gno-perf commit>+<binary hash>
+Context: gas-schedule, stdlib-changed (whole diff; explains no single series)
 WARNING: ...
-### Regressions | Improvements | Explained changes | Tier 2 (informational)
-| benchmark | metric | base | head | Δ | Δ% | size | notes |
+### Overall result: ❌✅ regressions and improvements - review needed
+| series | ❌ up | ✅ down | explained | mean Δ% | range Δ% | ≥0.2% |
+### Regressions | Improvements | Explained changes
+<details> Secondary: summary + Secondary regressions | improvements | explained changes
+<details> Tier 2 (informational)
+N Tier 1 changes below 0.2% are counted above but not listed; rerun with --all.
 ```
 
-| Section | Meaning |
-|---|---|
-| Regressions | Tier 1 increases without cause tags; review required |
-| Improvements | Tier 1 decreases without cause tags; review required |
-| Explained changes | Tier 1 with at least one cause tag in `notes` |
-| Tier 2 (informational) | Significant wall-clock changes; benchstat statistics in `notes`; not an alert criterion |
+Modeled on rustc-perf's PR comments: a verdict and per-metric summary first, details after.
 
-Sorted by descending `|Δ%|`. `unit` series sharing package, metric, direction, and tags collapse into `pkg (N tests)`; expand with `--all`.
+| Part | Meaning |
+|---|---|
+| Overall result | Set only by **primary** changes: `gas`, `gas_used`, `storage` outside `quarantined/`, at least 0.2%, without per-series cause tags. `review needed` or `no action needed` |
+| Summary table | One row per `kind metric` over **every** Tier 1 change, including those too small to list: direction counts, explained count, mean and range of Δ%, and how many reach 0.2% |
+| Regressions / Improvements | Primary increases/decreases without cause tags; review required |
+| Explained changes | Primary changes with at least one cause tag in `notes` |
+| Secondary (collapsed) | `allocs`, `cycles`, `bin` bytes, and every `quarantined/` series; same summary and sections |
+| Tier 2 (collapsed) | Significant wall-clock changes; benchstat statistics in `notes`; not an alert criterion |
+
+- Section rows list only changes with `|Δ%| >= 0.2`, sorted by descending `|Δ%|`. Each section shows 10 rows; the rest are in a collapsed `N more rows` block (text format: a `rerun with --all` line).
+- `unit` series sharing package, metric, direction, and tags collapse into `pkg (N tests)`.
+- txtar rows shorten to `<file>#<n> <pkgpath>.<func>`.
+- `--all` disables the 0.2% filter, row cap, grouping, and name shortening. Copy `bisect --series` names from `--all` output.
 
 Size by `|Δ%|`: `<0.2` very small, `<1` small, `<2` moderate, `<5` large, otherwise very large.
 
@@ -169,6 +196,11 @@ Size by `|Δ%|`: `<0.2` very small, `<1` small, `<2` moderate, `<5` large, other
 | `test-changed` | Content hash of the test/filetest/txtar file changed |
 | `gaswanted-only` | Only txtar `-gas-wanted` / `GAS WANTED` values changed |
 | `dep-changed` | `.gno`/`gnomod.toml` changed in the package or any imported `examples/` package, transitively; excludes `_test.gno`/`_filetest.gno` |
+
+Diff-wide tags go on the `Context:` line. They apply to every series, so they do not move rows into Explained changes:
+
+| Tag | Condition in code |
+|---|---|
 | `stdlib-changed` | A file under `gnovm/stdlibs/` or `gnovm/tests/stdlibs/` changed |
 | `gas-schedule` | `gnovm/pkg/gnolang/machine.go` or `alloc.go` changed; whole-file check, not just constant blocks |
 

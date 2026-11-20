@@ -52,11 +52,17 @@ Complete these steps once before enabling sync:
 
 ## 3. Weekly triage
 
-Review only **unclassified sections (Regressions, Improvements)** in that week's sync reports. Skim Explained changes and Tier 2.
+Generate the week's draft, then judge only its `Review needed` entries (see §6):
+
+```sh
+gnoperf triage <last log's final commit>..origin/master > triage/YYYY-MM-DD.md
+```
+
+For a single sync report, read its `Overall result` line first: `review needed` means primary Regressions or Improvements exist. Review only those sections; skim Explained changes and the collapsed Secondary/Tier 2 blocks. The summary table counts changes below 0.2% too, so a broad shift (e.g. most txtar `gas_used` up) shows there even when no row is listed.
 
 ```sh
 cd ~/.cache/gno-perf/reports
-find . -name '*.md' ! -name 'pr-*' -mtime -7 -exec grep -l -e '^### Regressions' -e '^### Improvements' {} +
+find . -name '*.md' ! -name 'pr-*' -mtime -7 -exec grep -l 'review needed' {} +
 find . -name '*.md' ! -name 'pr-*' -mtime -7 -exec grep -H '^WARNING:' {} +
 ```
 
@@ -68,7 +74,8 @@ find . -name '*.md' ! -name 'pr-*' -mtime -7 -exec grep -H '^WARNING:' {} +
 | Unclear range | Multiple commits involved, e.g. `backfill --every N` intervals | `gnoperf bisect <good> <bad> --series '<benchmark>:<metric>'` |
 
 - Apply the same criteria to improvements: unexplained decreases may indicate missing measurements or a changed test path.
-- Expand `pkg (N tests)` with `gnoperf compare <base> <head> --all` before judging.
+- Expand `pkg (N tests)` groups and hidden small changes with `gnoperf compare <base> <head> --all` before judging.
+- A `Context:` tag such as `gas-schedule` explains no row by itself; tie each listed change to the diff.
 
 ## 4. Nondeterministic series
 
@@ -89,36 +96,15 @@ sqlite3 ~/.cache/gno-perf/perf.db "
 
 - **Trust Tier 2 only from one dedicated machine.** Different host strings (OS/arch/CPU) automatically exclude it from reports.
 - **Recollect the baseline when the harness changes.** Its version is the gno-perf commit + binary hash; even rebuilding changes it. For `collector versions differ`, rerun `collect` for both commits with the current binary, then compare. On the dedicated machine, rebuild only when replacing the binary; record the replacement date in the triage log.
-- **Do not publish results automatically.** A regression may expose a security issue such as a gas bypass. Keep reports local and assess security implications before posting public issues or PR comments. For security issues, follow gno-core `SECURITY.md` and report to gno-security@newtendermint.org instead of opening a public issue.
+- **Publish only reviewed triage logs.** Weekly logs are committed to a public repo, but never automatically: a regression may expose a security issue such as a gas or storage bypass. Before committing, resolve the log's `Security check: TODO` line. Anything that could be a security issue goes to gno-core `SECURITY.md` (gno-security@newtendermint.org) first; leave it out of the log, or record it only as "under security review", until the fix is public. Raw reports and `perf.db` stay local. The same rule applies to public issues and PR comments.
 
-## 6. Weekly log template
+## 6. Weekly log
 
-Save as `triage/YYYY-MM-DD.md`.
+Like rustc-perf's `triage/` logs: the tool writes the tables, a person writes the verdicts.
 
-```markdown
-# gno-perf triage YYYY-MM-DD
-
-- Period: YYYY-MM-DD ~ YYYY-MM-DD
-- Commit range: <first sha>..<last sha> (N commits, based on sync-cursor)
-- harness: <harness string> (changed: no / yes, reason)
-- Incomplete collections: none / <sha> <step>
-
-## Verdicts
-
-| Commit | Series (benchmark:metric) | Δ / Δ% | Verdict | Follow-up |
-|---|---|---|---|---|
-| abc1234 (#NNNN) | gno.land/r/...#TestX:gas | +1,234 / +0.8% | Intended change | - |
-| def5678 (#NNNN) | ...:gas_used | ... | Actual regression | Notify author / issue #NNNN |
-| ... | ... | ... | Classifier error | Rule fix commit <sha> |
-| ... | ... | ... | Unclear range | bisect result <sha> |
-
-## Nondeterministic series
-
-| Series (kind:benchmark:metric) | First seen at commit | Status |
-|---|---|---|
-| unit:gno.land/p/...#TestY:gas | abc1234 | New, opened issue #NNNN / existing issue #NNNN |
-
-## Notes
-
-- 
-```
+1. Take `from` from the last committed log's revision range (its final commit); run `gnoperf triage from..origin/master > triage/YYYY-MM-DD.md`.
+2. Commits under `Not collected` need `sync` or `backfill` first; rerun the draft afterwards.
+3. Replace each `Verdict: TODO` with a §3 verdict and a one-line reason (e.g. "Intended change: new storage deposit path, author confirmed in #NNNN"). Check every `WARNING:` before trusting `No action needed`.
+4. Fill in the nondeterministic table's `Status` per §4.
+5. Replace `TODO: Summary` with one to three sentences on the week, `@???` with your handle, and resolve `Security check: TODO` per §5.
+6. Commit the log. Nothing else from `cache_dir` is committed.

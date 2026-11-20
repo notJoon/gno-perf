@@ -232,7 +232,7 @@ func TestNestedFiletestDependency(t *testing.T) {
 
 func TestReportPreservesExactGasIntegers(t *testing.T) {
 	a, b := collections("base", "head")
-	r := &Report{Base: a, Head: b, Changes: []Change{{Category: "Regressions", Benchmark: "pkg#Test", Metric: "gas", Base: 86347956429, Head: 86347956430, Delta: 1}}}
+	r := &Report{Base: a, Head: b, All: true, Changes: []Change{{Category: "Regressions", Benchmark: "pkg#Test", Metric: "gas", Base: 86347956429, Head: 86347956430, Delta: 1}}}
 	for _, format := range []string{"md", "text"} {
 		var out bytes.Buffer
 		if err := r.Write(&out, format); err != nil {
@@ -241,5 +241,51 @@ func TestReportPreservesExactGasIntegers(t *testing.T) {
 		if !strings.Contains(out.String(), "86347956429") || !strings.Contains(out.String(), "86347956430") || !strings.Contains(out.String(), "+1") {
 			t.Fatal(out.String())
 		}
+	}
+}
+
+func TestReportSummaryAndRelevance(t *testing.T) {
+	c, baseSHA := fixtureRepo(t)
+	headSHA := commitFiles(t, c.GnoCore, map[string]string{"gnovm/pkg/gnolang/alloc.go": "package gnolang\n"})
+	base, head := collections(baseSHA, headSHA)
+	tx := "a#1 gnokey maketx call -pkgpath gno.land/r/demo/x -func Set -gas-wanted 100 -broadcast"
+	for _, tc := range []struct {
+		kind, name, metric string
+		a, b               float64
+	}{{"tx", tx, "gas_used", 1000, 1010}, {"unit", "pkg#TestTiny", "gas", 100000, 100001}, {"unit", "quarantined/q#TestA", "allocs", 4100000, 4099999.9999999995 - 1000000}} {
+		m := Measurement{Tier: 1, Kind: tc.kind, Benchmark: tc.name, Metric: tc.metric, Value: tc.a, Precision: 1}
+		base.Values = append(base.Values, m)
+		m.Value = tc.b
+		head.Values = append(head.Values, m)
+	}
+	r, err := Compare(context.Background(), c.GnoCore, base, head, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(r.Context, ",") != "gas-schedule" {
+		t.Fatalf("diff-wide tag missing: %v", r.Context)
+	}
+	var out bytes.Buffer
+	if err = r.Write(&out, "md"); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	for _, want := range []string{"Overall result: ❌ regressions", "### Regressions", "a#1 gno.land/r/demo/x.Set", "| tx gas_used | 1 | 0 | 0 | +1% |", "| unit gas | 1 | 0 |", "3100000", "<details><summary>Secondary", "1 Tier 1 changes below 0.2%"} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("missing %q:\n%s", want, s)
+		}
+	}
+	for _, unwanted := range []string{"pkg#TestTiny", "3099999", "-broadcast"} {
+		if strings.Contains(s, unwanted) {
+			t.Fatalf("unexpected %q:\n%s", unwanted, s)
+		}
+	}
+	r.All = true
+	out.Reset()
+	if err = r.Write(&out, "text"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "pkg#TestTiny") || !strings.Contains(out.String(), "-broadcast") {
+		t.Fatalf("--all must list every series with exact names:\n%s", out.String())
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const usage = `Usage: gnoperf [--config path] <command> [options]
@@ -20,6 +21,7 @@ Commands:
   sync                Collect new first-parent master commits
   backfill from..to   Collect a historical range
   bisect good bad     Find a change in a deterministic series
+  triage from..to     Draft a weekly triage log from stored collections
   bench ops           Run opcode benchmarks manually
 `
 
@@ -104,7 +106,7 @@ func Run(ctx context.Context, args []string, out, errout io.Writer) error {
 	fs.SetOutput(errout)
 	var opts CollectOptions
 	var pkgs string
-	if args[0] != "compare" && args[0] != "bench" {
+	if args[0] != "compare" && args[0] != "bench" && args[0] != "triage" {
 		collectFlags(fs, &opts, &pkgs)
 	}
 	switch args[0] {
@@ -210,6 +212,14 @@ func Run(ctx context.Context, args []string, out, errout io.Writer) error {
 			return err
 		}
 		return SaveReport(c, r, fmt.Sprintf("pr-%d-%s.md", number, r.Head.SHA[:7]), out)
+	case "triage":
+		if err = parseFlags(fs, args[1:]); err != nil {
+			return err
+		}
+		if fs.NArg() != 1 {
+			return errors.New("triage requires one commit range")
+		}
+		return collector.Triage(ctx, fs.Arg(0), time.Now(), out)
 	case "compare":
 		format := fs.String("format", "md", "Report format: md or text")
 		all := fs.Bool("all", false, "Show every changed series")

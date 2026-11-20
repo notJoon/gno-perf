@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/perf/benchmath"
@@ -30,8 +31,11 @@ type Change struct {
 type Report struct {
 	Base, Head *Collection
 	Warnings   []string
-	Changes    []Change
-	Title      string
+	// Context holds cause tags that apply to the whole diff, so they explain no single series.
+	Context []string
+	Changes []Change
+	Title   string
+	All     bool
 }
 
 type snapshot struct {
@@ -154,7 +158,7 @@ func changedPackages(base, head *snapshot) map[string]bool {
 
 var gasWantedRE = regexp.MustCompile(`(-gas-wanted\s+|GAS WANTED:\s*)[0-9][0-9_]*`)
 
-func classification(ctx context.Context, repo string, base, head *Collection, changed []string, bs, hs *snapshot, packages map[string]bool, a, b Measurement) ([]string, error) {
+func classification(ctx context.Context, repo string, base, head *Collection, bs, hs *snapshot, packages map[string]bool, a, b Measurement) ([]string, error) {
 	var tags []string
 	if a.InputHash != "" && b.InputHash != "" && a.InputHash != b.InputHash {
 		gasOnly := false
@@ -182,6 +186,12 @@ func classification(ctx context.Context, repo string, base, head *Collection, ch
 	if (bs != nil && bs.affected(pkg, packages)) || (hs != nil && hs.affected(pkg, packages)) {
 		tags = append(tags, "dep-changed")
 	}
+	sort.Strings(tags)
+	return compactStrings(tags), nil
+}
+
+func diffContext(changed []string) []string {
+	var tags []string
 	for _, name := range changed {
 		if strings.HasPrefix(name, "gnovm/stdlibs/") || strings.HasPrefix(name, "gnovm/tests/stdlibs/") {
 			tags = append(tags, "stdlib-changed")
@@ -191,7 +201,7 @@ func classification(ctx context.Context, repo string, base, head *Collection, ch
 		}
 	}
 	sort.Strings(tags)
-	return compactStrings(tags), nil
+	return compactStrings(tags)
 }
 
 func Size(percent float64) string {
@@ -222,7 +232,7 @@ func platform(host string) string {
 }
 
 func Compare(ctx context.Context, repo string, base, head *Collection, all bool) (*Report, error) {
-	r := &Report{Base: base, Head: head}
+	r := &Report{Base: base, Head: head, All: all}
 	if !base.Complete || !head.Complete {
 		r.Warnings = append(r.Warnings, "one or both collections are incomplete; inspect collection errors")
 	}
@@ -271,6 +281,7 @@ func Compare(ctx context.Context, repo string, base, head *Collection, all bool)
 		return nil, err
 	}
 	changed := strings.Fields(changedText)
+	r.Context = diffContext(changed)
 	var bs, hs *snapshot
 	packages := map[string]bool{}
 	for _, f := range changed {
@@ -347,7 +358,7 @@ func Compare(ctx context.Context, repo string, base, head *Collection, all bool)
 		}
 		change.Size = Size(change.Percent)
 		if b.Tier == 1 {
-			change.Tags, err = classification(ctx, repo, base, head, changed, bs, hs, packages, a, b)
+			change.Tags, err = classification(ctx, repo, base, head, bs, hs, packages, a, b)
 			if err != nil {
 				return nil, err
 			}
@@ -369,17 +380,18 @@ func Compare(ctx context.Context, repo string, base, head *Collection, all bool)
 	if missing > 0 {
 		r.Warnings = append(r.Warnings, fmt.Sprintf("%d added or removed series have no counterpart", missing))
 	}
-	if !all {
-		r.Changes = groupChanges(r.Changes)
-	}
-	sort.Slice(r.Changes, func(i, j int) bool {
-		a, b := r.Changes[i], r.Changes[j]
+	sortChanges(r.Changes)
+	return r, nil
+}
+
+func sortChanges(changes []Change) {
+	sort.Slice(changes, func(i, j int) bool {
+		a, b := changes[i], changes[j]
 		if math.Abs(a.Percent) != math.Abs(b.Percent) {
 			return math.Abs(a.Percent) > math.Abs(b.Percent)
 		}
 		return a.Benchmark+"/"+a.Metric < b.Benchmark+"/"+b.Metric
 	})
-	return r, nil
 }
 
 func groupChanges(changes []Change) []Change {
@@ -426,12 +438,202 @@ func escapeCell(s string) string {
 	return strings.NewReplacer("\n", " ", "\r", " ", "\x00", "#").Replace(s)
 }
 
-func displayValue(value float64) string { return strconv.FormatFloat(value, 'f', -1, 64) }
+// Tier 1 is deterministic, so no noise threshold is needed; this only hides changes too small to act on.
+const relevantPercent = .2
+
+// maxRows caps each default report section; the rest are collapsed.
+const maxRows = 10
+
+var txCallRE = regexp.MustCompile(`-pkgpath\s+(\S+).*?-func\s+(\S+)`)
+
+// primary reports whether a change decides the overall result: gas and storage of non-quarantined code.
+func primary(c Change) bool {
+	return (c.Metric == "gas" || c.Metric == "gas_used" || c.Metric == "storage") && !strings.HasPrefix(c.Benchmark, "quarantined/")
+}
+
+func relevant(c Change) bool { return math.Abs(c.Percent) >= relevantPercent }
+
+func displayValue(value float64) string {
+	// Pretty-printed counts such as 4.1M parse to values like 4099999.9999999995.
+	if r := math.Round(value); math.Abs(value-r) <= 1e-9*math.Max(1, math.Abs(value)) {
+		value = r
+	}
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
 func displayDelta(value float64) string {
 	if value >= 0 {
 		return "+" + displayValue(value)
 	}
 	return displayValue(value)
+}
+
+func displayPercent(p float64) string { return fmt.Sprintf("%+.3g%%", p) }
+
+// displayName shortens txtar command lines; --all keeps exact names for bisect --series.
+func displayName(c Change, all bool) string {
+	if c.Kind != "tx" || all {
+		return c.Benchmark
+	}
+	id, cmd, _ := strings.Cut(c.Benchmark, " ")
+	if m := txCallRE.FindStringSubmatch(cmd); m != nil {
+		return id + " " + m[1] + "." + m[2]
+	}
+	if len(cmd) > 40 {
+		cmd = cmd[:40] + "…"
+	}
+	return strings.TrimSpace(id + " " + cmd)
+}
+
+func writeTable(b *strings.Builder, format string, header []string, rows [][]string) {
+	if format == "md" {
+		b.WriteString("| " + strings.Join(header, " | ") + " |\n|")
+		for _, h := range header {
+			switch h {
+			case "series", "benchmark", "metric", "size", "notes":
+				b.WriteString("---|")
+			default:
+				b.WriteString("---:|")
+			}
+		}
+		b.WriteString("\n")
+		for _, row := range rows {
+			for i := range row {
+				row[i] = escapeCell(row[i])
+			}
+			b.WriteString("| " + strings.Join(row, " | ") + " |\n")
+		}
+		return
+	}
+	w := tabwriter.NewWriter(b, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, strings.Join(header, "\t"))
+	for _, row := range rows {
+		fmt.Fprintln(w, strings.Join(row, "\t"))
+	}
+	w.Flush()
+}
+
+func summaryLabel(c Change) string {
+	label := c.Kind + " " + c.Metric
+	if strings.HasPrefix(c.Benchmark, "quarantined/") {
+		label += " (quarantined)"
+	}
+	return label
+}
+
+// writeSummary prints one row per series kind and metric over every Tier 1 change, listed or not.
+func writeSummary(b *strings.Builder, format string, changes []Change) {
+	type stat struct {
+		up, down, explained, relevant int
+		sum, min, max                 float64
+	}
+	stats := map[string]*stat{}
+	var labels []string
+	for _, c := range changes {
+		label := summaryLabel(c)
+		s := stats[label]
+		if s == nil {
+			s = &stat{min: math.Inf(1), max: math.Inf(-1)}
+			stats[label] = s
+			labels = append(labels, label)
+		}
+		if c.Delta > 0 {
+			s.up++
+		} else {
+			s.down++
+		}
+		if c.Category == "Explained changes" {
+			s.explained++
+		}
+		if relevant(c) {
+			s.relevant++
+		}
+		s.sum += c.Percent
+		s.min, s.max = math.Min(s.min, c.Percent), math.Max(s.max, c.Percent)
+	}
+	sort.Strings(labels)
+	var rows [][]string
+	for _, label := range labels {
+		s := stats[label]
+		n := s.up + s.down
+		rows = append(rows, []string{label, strconv.Itoa(s.up), strconv.Itoa(s.down), strconv.Itoa(s.explained), displayPercent(s.sum / float64(n)), "[" + displayPercent(s.min) + ", " + displayPercent(s.max) + "]", strconv.Itoa(s.relevant)})
+	}
+	writeTable(b, format, []string{"series", "❌ up", "✅ down", "explained", "mean Δ%", "range Δ%", fmt.Sprintf("≥%g%%", relevantPercent)}, rows)
+}
+
+func (r *Report) writeSection(b *strings.Builder, format, heading, title string, changes []Change) {
+	if len(changes) == 0 {
+		return
+	}
+	if !r.All {
+		changes = groupChanges(changes)
+		sortChanges(changes)
+	}
+	header := []string{"benchmark", "metric", "base", "head", "Δ", "Δ%", "size", "notes"}
+	rowsOf := func(changes []Change) [][]string {
+		var rows [][]string
+		for _, c := range changes {
+			notes := strings.Join(c.Tags, ", ")
+			if c.Statistics != "" {
+				notes = c.Statistics
+			}
+			rows = append(rows, []string{displayName(c, r.All), c.Metric, displayValue(c.Base), displayValue(c.Head), displayDelta(c.Delta), displayPercent(c.Percent), c.Size, notes})
+		}
+		return rows
+	}
+	shown, rest := changes, []Change(nil)
+	if !r.All && len(changes) > maxRows {
+		shown, rest = changes[:maxRows], changes[maxRows:]
+	}
+	if format == "md" {
+		fmt.Fprintf(b, "\n%s %s\n\n", heading, title)
+	} else {
+		fmt.Fprintf(b, "\n%s\n", title)
+	}
+	writeTable(b, format, header, rowsOf(shown))
+	if len(rest) == 0 {
+		return
+	}
+	if format == "md" {
+		fmt.Fprintf(b, "\n<details><summary>%d more rows</summary>\n\n", len(rest))
+		writeTable(b, format, header, rowsOf(rest))
+		b.WriteString("\n</details>\n")
+	} else {
+		fmt.Fprintf(b, "... %d more rows; rerun with --all\n", len(rest))
+	}
+}
+
+var tier1Categories = []string{"Regressions", "Improvements", "Explained changes"}
+
+// listed returns the rows a section shows: one category, relevant changes unless All.
+func (r *Report) listed(changes []Change, category string) []Change {
+	var out []Change
+	for _, c := range changes {
+		if c.Category == category && (r.All || relevant(c)) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func verdict(changes []Change) string {
+	up, down := false, false
+	for _, c := range changes {
+		if !primary(c) || !relevant(c) {
+			continue
+		}
+		up = up || c.Category == "Regressions"
+		down = down || c.Category == "Improvements"
+	}
+	switch {
+	case up && down:
+		return "❌✅ regressions and improvements - review needed"
+	case up:
+		return "❌ regressions - review needed"
+	case down:
+		return "✅ improvements - review needed"
+	}
+	return "no unexplained relevant changes - no action needed"
 }
 
 func (r *Report) Write(w io.Writer, format string) error {
@@ -449,38 +651,78 @@ func (r *Report) Write(w io.Writer, format string) error {
 		fmt.Fprintf(&b, "%s\n", title)
 	}
 	fmt.Fprintf(&b, "head %s vs base %s · harness %s\n\n", short(r.Head.SHA), short(r.Base.SHA), r.Head.HarnessSHA)
+	if len(r.Context) > 0 {
+		fmt.Fprintf(&b, "Context: %s (whole diff; explains no single series)\n\n", strings.Join(r.Context, ", "))
+	}
 	for _, warning := range r.Warnings {
 		fmt.Fprintf(&b, "WARNING: %s\n", escapeCell(warning))
 	}
-	for _, category := range []string{"Regressions", "Improvements", "Explained changes", "Tier 2 (informational)"} {
-		var rows []Change
-		for _, c := range r.Changes {
-			if c.Category == category {
-				rows = append(rows, c)
-			}
-		}
-		if len(rows) == 0 {
-			continue
-		}
-		if format == "md" {
-			fmt.Fprintf(&b, "\n### %s\n\n| benchmark | metric | base | head | Δ | Δ%% | size | notes |\n|---|---|---:|---:|---:|---:|---|---|\n", category)
-		} else {
-			fmt.Fprintf(&b, "\n%s\n", category)
-		}
-		for _, c := range rows {
-			notes := strings.Join(c.Tags, ", ")
-			if c.Statistics != "" {
-				notes = c.Statistics
-			}
-			if format == "md" {
-				fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %+.3g%% | %s | %s |\n", escapeCell(c.Benchmark), c.Metric, displayValue(c.Base), displayValue(c.Head), displayDelta(c.Delta), c.Percent, c.Size, escapeCell(notes))
-			} else {
-				fmt.Fprintf(&b, "%s %s: %s → %s (%s, %+.3g%%) %s %s\n", c.Benchmark, c.Metric, displayValue(c.Base), displayValue(c.Head), displayDelta(c.Delta), c.Percent, c.Size, notes)
-			}
-		}
-	}
 	if len(r.Changes) == 0 {
 		b.WriteString("\nNo reportable changes.\n")
+		_, err := io.WriteString(w, b.String())
+		return err
+	}
+	var tier1, tier2 []Change
+	for _, c := range r.Changes {
+		if c.Category == "Tier 2 (informational)" {
+			tier2 = append(tier2, c)
+		} else {
+			tier1 = append(tier1, c)
+		}
+	}
+	if format == "md" {
+		fmt.Fprintf(&b, "\n### Overall result: %s\n", verdict(tier1))
+	} else {
+		fmt.Fprintf(&b, "\nOverall result: %s\n", verdict(tier1))
+	}
+	var primaries, secondaries []Change
+	hidden := 0
+	for _, c := range tier1 {
+		if !r.All && !relevant(c) {
+			hidden++
+		}
+		if primary(c) {
+			primaries = append(primaries, c)
+		} else {
+			secondaries = append(secondaries, c)
+		}
+	}
+	if len(primaries) > 0 {
+		if format == "md" {
+			b.WriteString("\nPrimary: gas, gas_used, storage outside `quarantined/`. Counts include changes too small to list.\n\n")
+		} else {
+			b.WriteString("\nPrimary: gas, gas_used, storage outside quarantined/\n")
+		}
+		writeSummary(&b, format, primaries)
+		for _, category := range tier1Categories {
+			r.writeSection(&b, format, "###", category, r.listed(primaries, category))
+		}
+	}
+	if len(secondaries) > 0 {
+		if format == "md" {
+			fmt.Fprintf(&b, "\n<details><summary>Secondary: allocs, cycles, binary size, quarantined (%d series)</summary>\n\n", len(secondaries))
+		} else {
+			b.WriteString("\nSecondary: allocs, cycles, binary size, quarantined\n")
+		}
+		writeSummary(&b, format, secondaries)
+		for _, category := range tier1Categories {
+			r.writeSection(&b, format, "####", "Secondary "+strings.ToLower(category), r.listed(secondaries, category))
+		}
+		if format == "md" {
+			b.WriteString("\n</details>\n")
+		}
+	}
+	if len(tier2) > 0 {
+		if format == "md" {
+			b.WriteString("\n<details><summary>Tier 2 (informational)</summary>\n")
+		}
+		r.writeSection(&b, format, "###", "Tier 2 (informational)", tier2)
+		if format == "md" {
+			b.WriteString("\n</details>\n")
+		}
+	}
+	if hidden > 0 {
+		fmt.Fprintf(&b, "\n%d Tier 1 changes below %g%% are counted above but not listed; rerun with --all.\n", hidden, relevantPercent)
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
